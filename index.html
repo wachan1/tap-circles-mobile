@@ -1,257 +1,247 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Tap Circles Game</title>
+  <meta charset="UTF-8">
+  <title>Circle Tap Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     body {
       margin: 0;
+      overflow: hidden;
       background: #111;
       color: white;
       font-family: Arial, sans-serif;
-      overflow: hidden;
       touch-action: manipulation;
-      -webkit-user-select: none;
-      user-select: none;
     }
     #top-bar {
-      position: fixed;
+      position: absolute;
       top: 0;
-      left: 0;
       width: 100%;
       display: flex;
       justify-content: space-between;
-      padding: 10px 20px;
-      font-size: 18px;
-      font-weight: bold;
-      background: rgba(0, 0, 0, 0.3);
-      z-index: 10;
-    }
-    #game-area {
-      position: absolute;
-      top: 40px;
-      bottom: 60px;
-      left: 0;
-      right: 0;
-      overflow: hidden;
+      padding: 10px 15px;
+      font-size: 20px;
+      background: rgba(0, 0, 0, 0.4);
     }
     #bottom-bar {
-      position: fixed;
+      position: absolute;
       bottom: 0;
-      left: 0;
       width: 100%;
       display: flex;
-      justify-content: space-between;
-      padding: 10px 20px;
-      background: rgba(0, 0, 0, 0.3);
-      z-index: 10;
+      justify-content: center;
+      gap: 20px;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.4);
     }
     button {
-      background: #444;
+      font-size: 18px;
+      padding: 8px 16px;
       border: none;
-      padding: 10px 20px;
-      color: white;
-      font-size: 16px;
       border-radius: 6px;
-    }
-    button:active {
-      background: #666;
-    }
-    .circle {
-      position: absolute;
-      border-radius: 50%;
-      background: white;
-      opacity: 0.9;
-      transform: translate(-50%, -50%);
+      background: #444;
+      color: white;
     }
     #pause-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.7);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
-      z-index: 20;
-      display: none;
+      font-size: 28px;
+      color: white;
+      z-index: 10;
+      visibility: hidden;
     }
     #pause-overlay button {
       margin-top: 20px;
+      font-size: 22px;
+    }
+    canvas {
+      display: block;
     }
   </style>
 </head>
 <body>
   <div id="top-bar">
-    <div id="score">Score: 1000</div>
-    <div id="high-score">High: 0</div>
+    <div>Score: <span id="score">1000</span></div>
+    <div>High: <span id="highscore">0</span></div>
   </div>
-
-  <div id="game-area"></div>
-
+  <canvas id="gameCanvas"></canvas>
   <div id="bottom-bar">
-    <button id="restart">Restart</button>
-    <button id="pause">Pause</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="restartBtn">Restart</button>
   </div>
-
   <div id="pause-overlay">
     <div>Game Paused</div>
-    <button id="resume">Resume</button>
+    <button id="resumeBtn">Resume</button>
   </div>
 
-  <script>
-    const gameArea = document.getElementById("game-area");
-    const scoreDisplay = document.getElementById("score");
-    const highScoreDisplay = document.getElementById("high-score");
-    const pauseBtn = document.getElementById("pause");
-    const restartBtn = document.getElementById("restart");
-    const pauseOverlay = document.getElementById("pause-overlay");
-    const resumeBtn = document.getElementById("resume");
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let width, height;
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
 
-    let score = 1000;
-    let highScore = parseInt(localStorage.getItem("highScore")) || 0;
-    let circles = [];
-    let gameRunning = true;
-    let paused = false;
-    let elapsedTime = 0; // seconds
-    let lastSpawn = 0;
+let score = 1000;
+let highscore = parseInt(localStorage.getItem("circleGameHighScore")) || 0;
+document.getElementById("highscore").textContent = highscore;
 
-    highScoreDisplay.textContent = "High: " + highScore;
+let elapsed = 0; // seconds
+let lastFrame = performance.now();
+let paused = false;
+let circles = [];
 
-    class Circle {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.size = 20;
-        this.maxSize = 200;
-        this.growthRate = 0.5;
-        this.element = document.createElement("div");
-        this.element.className = "circle";
-        this.element.style.left = `${x}px`;
-        this.element.style.top = `${y}px`;
-        this.element.style.width = this.size + "px";
-        this.element.style.height = this.size + "px";
+class Circle {
+  constructor() {
+    this.x = Math.random() * (width - 60) + 30;
+    this.y = Math.random() * (height - 160) + 80;
+    this.radius = 10;
+    this.maxRadius = 120;
+    this.growthRate = 20; // pixels/sec, will scale with difficulty
+  }
+  update(dt, growthScale) {
+    this.radius += this.growthRate * growthScale * dt;
+  }
+  draw() {
+    let color;
+    if (this.radius < 40) color = "white";
+    else if (this.radius < 70) color = "blue";
+    else if (this.radius < 100) color = "red";
+    else color = "black";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  contains(px, py) {
+    return Math.hypot(this.x - px, this.y - py) < this.radius;
+  }
+}
 
-        this.element.addEventListener("click", () => this.destroy());
+canvas.addEventListener("touchstart", (e) => {
+  const touch = e.touches[0];
+  handleTap(touch.clientX, touch.clientY);
+});
 
-        gameArea.appendChild(this.element);
-      }
-      update(delta) {
-        this.size += this.growthRate * delta;
-        if (this.size > this.maxSize) {
-          score -= 50;
-          this.remove();
-        } else {
-          this.updateColor();
-          this.element.style.width = this.size + "px";
-          this.element.style.height = this.size + "px";
-        }
-      }
-      updateColor() {
-        let p = this.size / this.maxSize;
-        if (p < 0.33) this.element.style.background = "white";
-        else if (p < 0.66) this.element.style.background = "blue";
-        else if (p < 0.9) this.element.style.background = "red";
-        else this.element.style.background = "black";
-      }
-      destroy() {
-        let p = 1 - this.size / this.maxSize;
-        let gained = Math.max(10, Math.floor(p * 200));
-        score += gained;
-        this.remove();
-      }
-      remove() {
-        gameArea.removeChild(this.element);
-        circles = circles.filter(c => c !== this);
-      }
+canvas.addEventListener("mousedown", (e) => {
+  handleTap(e.clientX, e.clientY);
+});
+
+function handleTap(x, y) {
+  for (let i = circles.length - 1; i >= 0; i--) {
+    if (circles[i].contains(x, y)) {
+      let c = circles[i];
+      let points = Math.max(10, 150 - c.radius); // smaller circle = more points
+      score += Math.floor(points);
+      circles.splice(i, 1);
+      return;
     }
+  }
+}
 
-    function spawnCircle() {
-      let x = Math.random() * gameArea.clientWidth;
-      let y = Math.random() * gameArea.clientHeight;
-      circles.push(new Circle(x, y));
+function spawnCircle() {
+  if (circles.length < maxCircles()) {
+    circles.push(new Circle());
+  }
+}
+
+function spawnInterval() {
+  // decreases as elapsed increases (down to ~0.6s)
+  return Math.max(0.6, 2.0 - 0.05 * Math.log(elapsed+1));
+}
+
+function growthScale() {
+  // circle grows faster over time
+  return 1 + 0.02 * Math.log(elapsed+1);
+}
+
+function maxCircles() {
+  // increases gradually with time, capped at 6
+  return Math.min(6, 2 + Math.floor(elapsed/15));
+}
+
+let spawnTimer = 0;
+
+function update(dt) {
+  elapsed += dt;
+  // subtract score for survival timer
+  score -= 100 * dt;
+  if (score <= 0) {
+    score = 0;
+    gameOver();
+    return;
+  }
+  spawnTimer += dt;
+  if (spawnTimer >= spawnInterval()) {
+    spawnCircle();
+    spawnTimer = 0;
+  }
+  for (let i = circles.length-1; i >= 0; i--) {
+    circles[i].update(dt, growthScale());
+    if (circles[i].radius > circles[i].maxRadius) {
+      score -= 200; // penalty
+      circles.splice(i, 1);
     }
+  }
+}
 
-    let lastTime = performance.now();
+function draw() {
+  ctx.clearRect(0, 0, width, height);
+  circles.forEach(c => c.draw());
+}
 
-    function gameLoop(now) {
-      if (!gameRunning) return;
-      if (paused) {
-        lastTime = now;
-        requestAnimationFrame(gameLoop);
-        return;
-      }
-
-      let delta = (now - lastTime) / 16.67;
-      lastTime = now;
-
-      // Update elapsed time
-      elapsedTime += delta / 60;
-
-      // Progressive difficulty
-      let spawnInterval = Math.max(500, 2000 - elapsedTime * 50); // faster spawns
-      let maxCircles = Math.min(6, 1 + Math.floor(elapsedTime / 10));
-      let growthBoost = 0.01 * elapsedTime; // increase growth rate over time
-
-      // Spawn circles
-      if (now - lastSpawn > spawnInterval && circles.length < maxCircles) {
-        spawnCircle();
-        lastSpawn = now;
-      }
-
-      // Update circles
-      circles.forEach(c => {
-        c.growthRate = 0.5 + growthBoost;
-        c.update(delta);
-      });
-
-      // Update score
-      score -= delta * 1.5; // lose points over time
-      if (score <= 0) {
-        gameOver();
-      }
-
-      // Update UI
-      scoreDisplay.textContent = "Score: " + Math.max(0, Math.floor(score));
-      if (score > highScore) {
-        highScore = Math.floor(score);
-        localStorage.setItem("highScore", highScore);
-      }
-      highScoreDisplay.textContent = "High: " + highScore;
-
-      requestAnimationFrame(gameLoop);
+function loop(timestamp) {
+  if (!paused) {
+    let dt = (timestamp - lastFrame) / 1000;
+    lastFrame = timestamp;
+    update(dt);
+    draw();
+    document.getElementById("score").textContent = Math.floor(score);
+    if (score > highscore) {
+      highscore = Math.floor(score);
+      localStorage.setItem("circleGameHighScore", highscore);
+      document.getElementById("highscore").textContent = highscore;
     }
+  } else {
+    lastFrame = timestamp; // prevent time jump
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 
-    function gameOver() {
-      gameRunning = false;
-      alert("Game Over! Final score: " + Math.floor(score));
-    }
+function gameOver() {
+  paused = true;
+  document.getElementById("pause-overlay").style.visibility = "visible";
+  document.getElementById("pause-overlay").firstChild.textContent = "Game Over";
+}
 
-    pauseBtn.addEventListener("click", () => {
-      paused = true;
-      pauseOverlay.style.display = "flex";
-    });
+document.getElementById("pauseBtn").addEventListener("click", () => {
+  paused = true;
+  document.getElementById("pause-overlay").style.visibility = "visible";
+  document.getElementById("pause-overlay").firstChild.textContent = "Game Paused";
+});
+document.getElementById("resumeBtn").addEventListener("click", () => {
+  paused = false;
+  document.getElementById("pause-overlay").style.visibility = "hidden";
+});
+document.getElementById("restartBtn").addEventListener("click", restart);
 
-    resumeBtn.addEventListener("click", () => {
-      paused = false;
-      pauseOverlay.style.display = "none";
-    });
-
-    restartBtn.addEventListener("click", () => {
-      score = 1000;
-      elapsedTime = 0;
-      lastSpawn = 0;
-      circles.forEach(c => c.remove());
-      circles = [];
-      gameRunning = true;
-      paused = false;
-      pauseOverlay.style.display = "none";
-      lastTime = performance.now();
-      requestAnimationFrame(gameLoop);
-    });
-
-    requestAnimationFrame(gameLoop);
-  </script>
+function restart() {
+  score = 1000;
+  elapsed = 0;
+  circles = [];
+  spawnTimer = 0;
+  paused = false;
+  document.getElementById("pause-overlay").style.visibility = "hidden";
+}
+</script>
 </body>
 </html>
