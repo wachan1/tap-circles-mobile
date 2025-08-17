@@ -340,7 +340,7 @@
     // We'll randomly pick a base target size depending on screen min dimension
     const rect = canvas.getBoundingClientRect();
     const minDim = Math.min(rect.width, rect.height);
-    const baseMaxR = Math.max(30, Math.floor(minDim * rand(0.08, 0.18))); // px
+    const baseMaxR = Math.max(50, Math.floor(minDim * rand(0.08, 0.18))); // px
     const maxRadius = baseMaxR;
 
     // pick position avoiding top/bottom UI
@@ -407,8 +407,8 @@
     circle.popped = true;
     // compute ratio: 0 (small) -> 1 (at max radius)
     const ratio = Math.min(1, circle.radius / circle.maxRadius);
-    // Points: early pop = more points (range approx 120 -> 20)
-    const points = Math.round(20 + (1 - ratio) * 100); // 20..120
+    // Points: early pop = more points (range approx 1100 -> 100)
+    const points = Math.round(100 + (1 - ratio) * 100); // 100..1100
     score += points;
     createFloatingText('+' + points, circle.x, circle.y - 8, '#d2ffd7');
     // play pop animation: shrink quickly (we'll mark removed in render)
