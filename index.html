@@ -1,559 +1,666 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Circle Tapper</title>
-<style>
-  :root {
-    --bg0: #0b0f1a;
-    --bg1: #121a2a;
-    --text: #ffffff;
-    --accent: #ffd166;
-    --good: #3ad29f;
-    --bad: #ff5964;
-    --overlay: rgba(0,0,0,0.6);
-    --panel: rgba(20,27,45,0.9);
-  }
+  <meta charset="utf-8" />
+  <title>Circle Tapper</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <style>
+    :root{
+      --bg1:#0b0f16;
+      --bg2:#151b26;
+      --hudH:56px;
+      --ctrlH:64px;
+      --accent:#ffd54a; /* high score */
+      --good:#33d17a;
+      --bad:#ff4d4f;
+      --text:#ffffff;
+      --muted:#9aa4b2;
+      --panel:#0f1420cc;
+      --btn:#1f2837;
+      --btnText:#e6e9ee;
+      --btnHover:#2a3447;
+      --shadow:rgba(0,0,0,.35);
+    }
 
-  html, body {
-    margin: 0; padding: 0; height: 100%; background: radial-gradient(120% 120% at 50% 0%, var(--bg1), var(--bg0));
-    color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    touch-action: none; overscroll-behavior: none;
-  }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{ height:100%; margin:0; }
+    body{
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background: radial-gradient(1200px 900px at 50% 30%, var(--bg2), var(--bg1));
+      overflow:hidden; /* no scrolling */
+      user-select:none;
+      touch-action:manipulation;
+    }
 
-  #app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+    /* HUD (top) */
+    #hud{
+      position:fixed; top:0; left:0; right:0; height:var(--hudH);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 14px;
+      background:linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.10));
+      backdrop-filter: blur(6px);
+      z-index:10;
+    }
+    #score{ font-weight:800; font-size:20px; letter-spacing:.3px; }
+    #high{ font-weight:700; font-size:16px; color:var(--accent); }
 
-  /* Top bar */
-  .topbar {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: env(safe-area-inset-top) 16px 8px 16px;
-    font-weight: 700; letter-spacing: 0.3px; user-select: none; -webkit-user-select: none;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.25), rgba(0,0,0,0));
-  }
-  .score { font-size: 20px; }
-  .high { font-size: 16px; color: var(--accent); }
+    /* Controls (bottom) */
+    #controls{
+      position:fixed; bottom:0; left:0; right:0; height:var(--ctrlH);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 12px;
+      background:linear-gradient(to top, rgba(0,0,0,.35), rgba(0,0,0,.10));
+      backdrop-filter: blur(6px);
+      z-index:10;
+    }
+    .ctrl-btn{
+      appearance:none; border:0; border-radius:12px;
+      padding:12px 16px; font-weight:700; font-size:15px;
+      background:var(--btn); color:var(--btnText); box-shadow:0 6px 16px var(--shadow);
+    }
+    .ctrl-btn:active{ transform:translateY(1px); background:var(--btnHover); }
 
-  /* Canvas play area */
-  #gameCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    #muteIcon{ margin-left:8px; font-size:12px; color:var(--muted); }
 
-  /* Bottom bar */
-  .bottombar {
-    display: flex; justify-content: space-between; align-items: center; gap: 12px;
-    padding: 8px 16px calc(8px + env(safe-area-inset-bottom)) 16px;
-    background: linear-gradient(to top, rgba(0,0,0,0.25), rgba(0,0,0,0));
-  }
-  .btn {
-    flex: 1 1 0; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.06); color: var(--text); font-weight: 700; font-size: 16px;
-    text-align: center; -webkit-tap-highlight-color: transparent;
-  }
-  .btn:active { transform: scale(0.98); }
+    /* Game container & canvas */
+    #game-container{
+      position:fixed;
+      top:var(--hudH);
+      bottom:var(--ctrlH);
+      left:0; right:0;
+      height: calc(100svh - var(--hudH) - var(--ctrlH));
+      /* svh helps on iOS address bar */
+    }
+    #game{
+      width:100%; height:100%; display:block;
+    }
 
-  /* Overlays */
-  .overlay {
-    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: var(--overlay); backdrop-filter: blur(2px);
-    padding: 24px; z-index: 10;
-  }
-  .overlay.show { display: flex; }
+    /* Overlays */
+    .overlay{
+      position:fixed; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.42);
+      backdrop-filter: blur(4px);
+      z-index:20;
+    }
+    .panel{
+      width:min(92vw, 420px);
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      box-shadow:0 12px 40px rgba(0,0,0,.5);
+      padding:22px;
+      text-align:center;
+    }
+    .title{ font-size:28px; font-weight:900; margin:6px 0 16px; }
+    .subtitle{ color:#c8d0db; margin-bottom:18px; font-size:14px; line-height:1.4; }
+    .stack{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    .btn{
+      appearance:none; border:0; border-radius:12px; padding:14px 16px;
+      background:#334155; color:#f7fafc; font-weight:800; font-size:15px;
+      cursor:pointer; box-shadow:0 6px 16px var(--shadow);
+      min-width:140px;
+    }
+    .btn.primary{ background:#2563eb; }
+    .btn.danger{ background:#be123c; }
+    .btn:hover{ filter:brightness(1.05); }
+    .btn:active{ transform: translateY(1px); }
 
-  .panel {
-    width: min(520px, 90vw); border-radius: 16px; background: var(--panel); padding: 20px;
-    border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  }
-  .panel h1 { margin: 0 0 10px; font-size: 28px; }
-  .panel h2 { margin: 0 0 16px; font-size: 22px; }
-  .panel p { margin: 0 0 12px; opacity: 0.9; line-height: 1.4; }
-  .panel .actions { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
-  .panel .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hidden{ display:none !important; }
 
-  .btn.primary { background: linear-gradient(180deg, #5cd5ff, #2687ff); border: none; }
-  .btn.good    { background: linear-gradient(180deg, #56f1b2, #2bbf86); border: none; }
-  .btn.warn    { background: linear-gradient(180deg, #ff8d8d, #ff4f4f); border: none; }
+    /* Game Over text */
+    .finalScore{ font-size:24px; font-weight:800; margin:6px 0 12px; }
+    .newHigh{ color:var(--accent); font-weight:900; animation:bling 900ms ease-out both; }
+    @keyframes bling { from{ filter:brightness(0.9); transform:scale(.97);} to{ filter:brightness(1.2); transform:scale(1.02);} }
 
-  /* Floating points */
-  .float-layer { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
-  .float { position: absolute; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+    /* Red edge flash overlay (penalty) */
+    #redFlash{
+      pointer-events:none;
+      position:fixed; inset:0; z-index:19; opacity:0;
+      background: radial-gradient(circle at 50% 50%,
+        rgba(255,0,0,0) 65%,
+        rgba(255,0,0,0.25) 80%,
+        rgba(255,0,0,0.6) 100%);
+    }
+    #redFlash.flash{ animation:flashEdge 320ms ease-out; }
+    @keyframes flashEdge{ 0%{opacity:.0;} 30%{opacity:.7;} 100%{opacity:0;} }
 
-  /* Red damage vignette */
-  .damage {
-    position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0;
-    background: radial-gradient(60% 60% at 50% 50%, rgba(255,0,0,0.0), rgba(255,0,0,0.35) 80%);
-  }
-  .damage.flash { animation: flash 300ms ease-out; }
-  @keyframes flash {
-    0% { opacity: 0.0; }
-    40% { opacity: 1.0; }
-    100% { opacity: 0.0; }
-  }
-</style>
+    /* On-canvas floating text: handled in canvas, but reserve layer if needed */
+  </style>
 </head>
 <body>
-<div id="app">
-  <div class="topbar">
-    <div class="score">Score: <span id="scoreText">1000</span></div>
-    <div class="high">High: <span id="highText">0</span></div>
+  <!-- HUD -->
+  <div id="hud">
+    <div id="score">Score: 1000</div>
+    <div id="high">High: 0</div>
   </div>
 
-  <canvas id="gameCanvas"></canvas>
-
-  <div class="bottombar">
-    <button class="btn" id="pauseBtn">⏸ Pause</button>
-    <button class="btn" id="restartBtn">🔄 Restart</button>
+  <!-- Game area -->
+  <div id="game-container">
+    <canvas id="game" width="300" height="150"></canvas>
   </div>
-</div>
 
-<!-- Start Screen -->
-<div class="overlay show" id="startOverlay" aria-modal="true">
-  <div class="panel">
-    <h1>Circle Tapper</h1>
-    <p>Tap circles early for points. After 80% size they turn red and cost you points. Score ticks down 100/sec — survive and score big.</p>
-    <div class="actions">
-      <button class="btn primary" id="startBtn">Start</button>
-      <button class="btn" id="muteToggleStart">🔊 Mute/Unmute</button>
+  <!-- Controls -->
+  <div id="controls">
+    <button id="pauseBtn" class="ctrl-btn">⏸ Pause</button>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button id="restartBtn" class="ctrl-btn">🔄 Restart</button>
+      <span id="muteIcon">🔊</span>
     </div>
   </div>
-</div>
 
-<!-- Pause Menu -->
-<div class="overlay" id="pauseOverlay" aria-modal="true">
-  <div class="panel">
-    <h2>Paused</h2>
-    <div class="actions">
-      <button class="btn good" id="resumeBtn">▶ Resume</button>
-      <div class="row">
-        <button class="btn" id="muteToggle">🔊 Mute/Unmute</button>
-        <button class="btn" id="restartFromPauseBtn">🔄 Restart</button>
+  <!-- Red flash overlay -->
+  <div id="redFlash"></div>
+
+  <!-- Start Screen -->
+  <div id="startOverlay" class="overlay">
+    <div class="panel">
+      <div class="title">Circle Tapper</div>
+      <div class="subtitle">
+        Tap growing circles before they turn <b style="color:#ef4444">red</b> (&gt;80%).<br/>
+        Earn more by tapping earlier — lose points if you're late.
       </div>
-      <button class="btn warn" id="backToStartBtn">↩ Back to Start</button>
+      <div class="stack">
+        <button id="startBtn" class="btn primary">Start Game</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Game Over -->
-<div class="overlay" id="gameOverOverlay" aria-modal="true">
-  <div class="panel">
-    <h2>Game Over</h2>
-    <p>Your Score: <strong id="finalScore">0</strong></p>
-    <p id="newHigh" style="display:none;">🏆 NEW HIGH SCORE!</p>
-    <div class="actions">
-      <button class="btn good" id="playAgainBtn">▶ Play Again</button>
-      <button class="btn" id="backToStart2Btn">↩ Back to Start</button>
+  <!-- Pause Menu -->
+  <div id="pauseOverlay" class="overlay hidden">
+    <div class="panel">
+      <div class="title">Paused</div>
+      <div class="stack" style="margin-top:8px; margin-bottom:4px;">
+        <button id="resumeBtn" class="btn primary">Resume</button>
+        <button id="pmRestartBtn" class="btn">Restart</button>
+        <button id="muteToggleBtn" class="btn">Mute / Unmute</button>
+        <button id="backToStartBtn" class="btn danger">Back to Start</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Red vignette & floating points layer -->
-<div class="damage" id="damageFlash"></div>
-<div class="float-layer" id="floatLayer"></div>
+  <!-- Game Over -->
+  <div id="gameOverOverlay" class="overlay hidden">
+    <div class="panel">
+      <div class="title">Game Over</div>
+      <div id="finalScore" class="finalScore">Score: 0</div>
+      <div id="newHighBanner" class="newHigh hidden">🏆 NEW HIGH SCORE!</div>
+      <div class="stack" style="margin-top:8px;">
+        <button id="playAgainBtn" class="btn primary">Play Again</button>
+        <button id="goStartBtn" class="btn">Back to Start</button>
+      </div>
+    </div>
+  </div>
 
-<script>
-(function() {
-  // ======== Config / Constants ========
-  const START_SCORE = 1000;
-  const SCORE_DRAIN_PER_SEC = 100;
+  <script>
+    /**
+     * Circle Tapper — Single-file implementation
+     * Mobile-first, works in Safari on iPhone. No external libs.
+     */
 
-  // Growth speeds (px/sec)
-  const MIN_GROWTH = 20;
-  const MAX_GROWTH = 120;
+    // ----- DOM refs
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const highEl = document.getElementById('high');
+    const redFlashEl = document.getElementById('redFlash');
 
-  const MAX_CIRCLES_CAP = 6;
+    const startOverlay = document.getElementById('startOverlay');
+    const startBtn = document.getElementById('startBtn');
 
-  // Colors by ratio
-  function colorForRatio(ratio) {
-    if (ratio >= 1) return '#000000';
-    if (ratio >= 0.8) return '#ff3b30'; // red
-    if (ratio >= 0.4) return '#3a86ff'; // blue
-    return '#ffffff';                   // white
-  }
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const pmRestartBtn = document.getElementById('pmRestartBtn');
+    const backToStartBtn = document.getElementById('backToStartBtn');
+    const muteToggleBtn = document.getElementById('muteToggleBtn');
 
-  // ======== State ========
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d', { alpha: false });
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const newHighBanner = document.getElementById('newHighBanner');
 
-  const scoreEl = document.getElementById('scoreText');
-  const highEl  = document.getElementById('highText');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const muteIcon = document.getElementById('muteIcon');
 
-  const startOverlay = document.getElementById('startOverlay');
-  const pauseOverlay = document.getElementById('pauseOverlay');
-  const gameOverOverlay = document.getElementById('gameOverOverlay');
+    // ----- Game constants (design-driven)
+    const START_SCORE = 1000;
+    const SURVIVAL_LOSS_PER_SEC = 100;
 
-  const damageFlash = document.getElementById('damageFlash');
-  const floatLayer = document.getElementById('floatLayer');
+    // Difficulty scaling (time t in ms)
+    function spawnIntervalMs(t){
+      // 1.5s * e^(-0.0015 t) -> min 0.4s
+      return Math.max(400, 1500 * Math.exp(-0.0015 * (t/1))); // t is ms, factor is per ms
+    }
+    function growthSpeedPxPerSec(t){
+      // 20 + 100 * t/60000 cap 120
+      return Math.min(120, 20 + 100 * (t / 60000));
+    }
+    function maxCirclesAllowed(t){
+      // floor(1 + log_{1.5}(1 + t/10000)) <= 6
+      const val = 1 + (Math.log(1 + t/10000) / Math.log(1.5));
+      return Math.min(6, Math.max(1, Math.floor(val)));
+    }
 
-  const startBtn = document.getElementById('startBtn');
-  const muteToggleStart = document.getElementById('muteToggleStart');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const restartBtn = document.getElementById('restartBtn');
-  const resumeBtn = document.getElementById('resumeBtn');
-  const muteToggle = document.getElementById('muteToggle');
-  const restartFromPauseBtn = document.getElementById('restartFromPauseBtn');
-  const backToStartBtn = document.getElementById('backToStartBtn');
-  const backToStart2Btn = document.getElementById('backToStart2Btn');
-  const playAgainBtn = document.getElementById('playAgainBtn');
+    // Visual thresholds
+    const DANGER_THRESHOLD = 0.80; // 80%
+    const MIN_GROWTH = 20; // px/s
+    const MAX_GROWTH = 120; // px/s
 
-  const finalScoreEl = document.getElementById('finalScore');
-  const newHighEl = document.getElementById('newHigh');
+    // ----- Audio (negative feedback), created on first Start
+    let audioCtx = null;
+    let isMuted = false;
 
-  let width = 0, height = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+    function initAudio(){
+      if (audioCtx || isMuted) return;
+      try{
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }catch(e){ audioCtx = null; }
+    }
+    function buzzNegative(){
+      if (!audioCtx || isMuted) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
 
-  const storage = {
-    get high() { return Number(localStorage.getItem('ct_high') || 0); },
-    set high(v) { localStorage.setItem('ct_high', String(v)); },
-    get mute() { return localStorage.getItem('ct_mute') === '1'; },
-    set mute(v) { localStorage.setItem('ct_mute', v ? '1' : '0'); }
-  };
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.12);
 
-  let audio = {
-    ctx: null,
-    enabled: false,
-    init() {
-      if (this.ctx) return;
-      try {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.enabled = !storage.mute;
-      } catch (_) {
-        this.ctx = null;
-        this.enabled = false;
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.16);
+    }
+
+    // ----- Haptics
+    function vibrate(ms=60){
+      if (navigator.vibrate) {
+        try { navigator.vibrate(ms); } catch(_) {}
       }
-    },
-    buzz(duration = 80, freq = 140) {
-      if (!this.ctx || !this.enabled) return;
-      const t = this.ctx.currentTime;
-      const o = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      o.type = 'square'; o.frequency.setValueAtTime(freq, t);
-      g.gain.setValueAtTime(0.001, t);
-      g.gain.exponentialRampToValueAtTime(0.2, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, t + duration/1000);
-      o.connect(g).connect(this.ctx.destination);
-      o.start(t); o.stop(t + duration/1000);
-    },
-    pop(duration = 30, freq = 320) {
-      if (!this.ctx || !this.enabled) return;
-      const t = this.ctx.currentTime;
-      const o = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      o.type = 'sine'; o.frequency.setValueAtTime(freq, t);
-      g.gain.setValueAtTime(0.25, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + duration/1000);
-      o.connect(g).connect(this.ctx.destination);
-      o.start(t); o.stop(t + duration/1000);
-    }
-  };
-
-  function vibrate(ms=40) {
-    if (navigator.vibrate) navigator.vibrate(ms);
-  }
-
-  // UI init
-  highEl.textContent = storage.high;
-
-  function resize() {
-    const rect = document.body.getBoundingClientRect();
-    width = Math.floor(rect.width * dpr);
-    height = Math.floor(rect.height * dpr);
-    canvas.width = width;
-    canvas.height = height;
-    canvas.style.width = rect.width + 'px';
-    canvas.style.height = rect.height + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  // Prevent page scroll/zoom gestures interfering
-  window.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
-
-  // ======== Game Model ========
-  const STATE = { START: 'start', RUN: 'run', PAUSE: 'pause', OVER: 'over' };
-  let gameState = STATE.START;
-
-  let score = START_SCORE;
-  let high = storage.high;
-  let elapsed = 0; // ms since run start (paused time excluded)
-  let lastFrameTime = 0;
-  let spawnAccumulator = 0;
-
-  const circles = [];
-  const floatTexts = [];
-
-  function spawnInterval(t) {
-    // t in ms
-    return Math.max(0.4, 1.5 * Math.exp(-0.0015 * t/1)) * 1000; // return ms
-  }
-  function globalGrowthSpeed(t) {
-    const spd = MIN_GROWTH + (100 * (t / 60000));
-    return Math.min(MAX_GROWTH, spd);
-  }
-  function maxCircles(t) {
-    const v = 1 + Math.log(1 + (t / 10000)) / Math.log(1.5);
-    return Math.min(MAX_CIRCLES_CAP, Math.floor(v));
-  }
-
-  function newCircle(t) {
-    const rMax = Math.max(28, Math.min(window.innerWidth, window.innerHeight) * 0.18); // max radius in CSS px
-    // Slight per-circle variance around global speed (±12%)
-    const base = globalGrowthSpeed(t);
-    const speed = base * (0.88 + Math.random() * 0.24);
-
-    // Keep circles away from UI bars (approx 64px top/bottom)
-    const margin = rMax + 64;
-    const x = margin + Math.random() * (window.innerWidth - margin * 2);
-    const y = margin + Math.random() * (window.innerHeight - margin * 2);
-
-    return {
-      id: Math.random().toString(36).slice(2),
-      x, y, r: 0, rMax, speed, born: performance.now()
-    };
-  }
-
-  function baseRewardForCircle(c) {
-    // Guarantee at least +100 at spawn for slowest growth; scale with speed
-    // MIN_GROWTH -> 100, MAX_GROWTH -> 100 * (MAX/MIN) = 600
-    return 100 * (c.speed / MIN_GROWTH);
-  }
-
-  function rewardForTap(c) {
-    const ratio = Math.min(1, c.r / c.rMax);
-    const base = baseRewardForCircle(c);
-    if (ratio < 0.8) {
-      // Linear decay from base -> 0 across [0, 0.8]
-      const k = 1 - (ratio / 0.8);
-      return Math.round(base * k);
-    } else {
-      // Penalty grows from 0 -> -base across (0.8, 1]
-      const k = (ratio - 0.8) / 0.2; // 0..1
-      return -Math.round(base * k);
-    }
-  }
-
-  function autoPenalty(c) {
-    // When circle hits max size and disappears
-    return -Math.round(baseRewardForCircle(c));
-  }
-
-  function addFloatText(x, y, text, good) {
-    floatTexts.push({
-      x, y, text, good, t: 0, ttl: 700 // ms
-    });
-  }
-
-  function flashDamage() {
-    damageFlash.classList.remove('flash');
-    // force reflow to restart animation
-    void damageFlash.offsetWidth;
-    damageFlash.classList.add('flash');
-  }
-
-  // ======== Input ========
-  function getPointerPos(evt) {
-    if (evt.touches && evt.touches[0]) {
-      return { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
-    }
-    return { x: evt.clientX, y: evt.clientY };
-  }
-
-  function handleTap(x, y) {
-    if (gameState !== STATE.RUN) return;
-    // Find topmost circle whose center distance <= radius
-    // We'll test closest first
-    let best = null, bestDist = Infinity, bestIdx = -1;
-    for (let i = 0; i < circles.length; i++) {
-      const c = circles[i];
-      const dx = x - c.x, dy = y - c.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= c.r && dist < bestDist) { best = c; bestDist = dist; bestIdx = i; }
-    }
-    if (!best) return;
-
-    const delta = rewardForTap(best);
-    score = Math.max(0, Math.round(score + delta));
-    addFloatText(x, y - 8, (delta >= 0 ? '+' : '') + delta, delta >= 0);
-
-    if (delta < 0) {
-      vibrate(40);
-      audio.buzz(90, 160);
-      flashDamage();
-    } else {
-      audio.pop(35, 340);
     }
 
-    // Remove the tapped circle
-    circles.splice(bestIdx, 1);
-    // Update high score live
-    if (score > high) {
-      high = score; storage.high = high; highEl.textContent = high;
+    // ----- Storage
+    const LS_HIGH = 'circleTapper.high.v1';
+    const LS_MUTED = 'circleTapper.muted.v1';
+    function loadHigh(){ return parseInt(localStorage.getItem(LS_HIGH) || '0', 10); }
+    function saveHigh(v){ localStorage.setItem(LS_HIGH, String(v)); }
+    function loadMuted(){ return localStorage.getItem(LS_MUTED) === '1'; }
+    function saveMuted(v){ localStorage.setItem(LS_MUTED, v ? '1' : '0'); }
+
+    // ----- Canvas sizing (retina)
+    let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+    function resizeCanvas(){
+      const rect = document.getElementById('game-container').getBoundingClientRect();
+      viewW = Math.max(1, Math.floor(rect.width));
+      viewH = Math.max(1, Math.floor(rect.height));
+      dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      canvas.width = Math.floor(viewW * dpr);
+      canvas.height = Math.floor(viewH * dpr);
+      canvas.style.width = viewW + 'px';
+      canvas.style.height = viewH + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // redraw happens next frame
     }
-  }
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', ()=>setTimeout(resizeCanvas, 50));
 
-  canvas.addEventListener('touchstart', (e) => {
-    const p = getPointerPos(e);
-    handleTap(p.x, p.y);
-  }, { passive: true });
-  canvas.addEventListener('mousedown', (e) => {
-    const p = getPointerPos(e);
-    handleTap(p.x, p.y);
-  });
+    // ----- Game state
+    const STATE = { START:'start', PLAYING:'playing', PAUSED:'paused', GAMEOVER:'gameover' };
+    let state = STATE.START;
 
-  // ======== Loop ========
-  function step(ts) {
-    if (!lastFrameTime) lastFrameTime = ts;
-    const dt = Math.max(0, Math.min(50, ts - lastFrameTime)); // clamp to 50ms/frame
-    lastFrameTime = ts;
+    let score = START_SCORE;
+    let high = loadHigh();
+    let elapsedMs = 0; // advances only during PLAYING
+    let lastTs = performance.now();
+    let timeSinceSpawnMs = 0;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // circles, ripples, floating texts
+    const circles = [];
+    const ripples = [];
+    const floaters = [];
 
-    if (gameState === STATE.RUN) {
-      elapsed += dt;
-      // Score drain
-      score = Math.max(0, score - (SCORE_DRAIN_PER_SEC * dt / 1000));
-      score = Math.round(score);
-      scoreEl.textContent = score;
-      if (score > high) { high = score; storage.high = high; highEl.textContent = high; }
-
-      // Spawning
-      spawnAccumulator += dt;
-      const interval = spawnInterval(elapsed);
-      const cap = maxCircles(elapsed);
-      while (spawnAccumulator >= interval && circles.length < cap) {
-        spawnAccumulator -= interval;
-        circles.push(newCircle(elapsed));
+    class Circle {
+      constructor(x, y, maxR, growth){
+        this.x = x; this.y = y;
+        this.r = Math.max(2, Math.min(8, maxR*0.12)); // tiny start radius
+        this.maxR = maxR;
+        this.growth = growth; // px/sec
+        // Base reward scales with growth speed; at min growth => 100
+        this.baseReward = Math.round(100 * (this.growth / MIN_GROWTH));
+        // visual pulse phase
+        this.pulse = Math.random() * Math.PI * 2;
       }
+      update(dt){
+        this.pulse += dt * 6;
+        this.r += this.growth * dt;
+        if (this.r >= this.maxR){
+          // auto penalty and remove
+          applyScore(-this.baseReward, this.x, this.y, true);
+          return true; // remove
+        }
+        return false;
+      }
+      draw(ctx){
+        const ratio = this.r / this.maxR;
+        // color mapping
+        let fill = '#ffffff';
+        if (ratio < 0.4){ fill = '#ffffff'; }
+        else if (ratio < DANGER_THRESHOLD){ fill = '#69a7ff'; } // blue mid
+        else if (ratio <= 1.0){ fill = '#ef4444'; } // red danger
+        else { fill = '#111'; } // black oversize (unlikely here)
 
-      // Update circles
-      for (let i = circles.length - 1; i >= 0; i--) {
+        // subtle glow
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 2;
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+        ctx.fillStyle = fill;
+        ctx.fill();
+
+        // pulse ring (very faint)
+        const ringR = this.r + 4 + Math.sin(this.pulse) * 1.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, ringR, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
+
+    function addRipple(x,y){
+      ripples.push({x,y,r:8, life:0});
+    }
+    function drawRipples(dt){
+      for (let i=ripples.length-1;i>=0;i--){
+        const rp = riples = ripples[i];
+        rp.life += dt;
+        rp.r += 180 * dt;
+        const alpha = Math.max(0, 0.4 - rp.life * 0.6);
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        if (alpha <= 0) ripples.splice(i,1);
+      }
+    }
+
+    function addFloater(text, x, y, color){
+      floaters.push({text, x, y, vy:-60, life:0, color});
+    }
+    function drawFloaters(dt){
+      for (let i=floaters.length-1;i>=0;i--){
+        const f = floaters[i];
+        f.life += dt;
+        f.y += f.vy * dt;
+        const alpha = Math.max(0, 1 - f.life*1.8);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = '700 16px ui-sans-serif, -apple-system, Roboto, Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = f.color;
+        ctx.fillText(f.text, f.x, f.y);
+        ctx.restore();
+        if (alpha <= 0) floaters.splice(i,1);
+      }
+    }
+
+    function showRedFlash(){
+      redFlashEl.classList.remove('flash');
+      // force reflow to restart animation
+      void redFlashEl.offsetWidth;
+      redFlashEl.classList.add('flash');
+    }
+
+    function applyScore(delta, x, y, isAuto=false){
+      score = Math.max(0, score + delta);
+      if (delta >= 0){
+        addFloater('+'+delta, x, y-8, 'rgba(51,209,122,0.95)');
+        addRipple(x,y);
+      } else {
+        addFloater(String(delta), x, y-8, 'rgba(255,77,79,0.95)');
+        showRedFlash();
+        vibrate(60);
+        buzzNegative();
+      }
+      // live high score update
+      if (score > high){
+        high = score;
+        saveHigh(high);
+      }
+      updateHud();
+      if (score <= 0){
+        endGame();
+      }
+    }
+
+    function updateHud(){
+      scoreEl.textContent = `Score: ${Math.max(0, Math.floor(score))}`;
+      highEl.textContent = `High: ${Math.floor(high)}`;
+      muteIcon.textContent = isMuted ? '🔇' : '🔊';
+    }
+
+    function resetGameValues(){
+      score = START_SCORE;
+      elapsedMs = 0;
+      timeSinceSpawnMs = 0;
+      circles.length = 0;
+      ripples.length = 0;
+      floaters.length = 0;
+      updateHud();
+    }
+
+    function spawnCircle(){
+      // choose max radius relative to viewport size for variety
+      const minMaxR = Math.max(26, Math.min(viewW, viewH) * 0.06);
+      const maxMaxR = Math.max(44, Math.min(viewW, viewH) * 0.12);
+      const maxR = rand(minMaxR, maxMaxR);
+
+      // position within safe bounds
+      const x = rand(maxR + 4, viewW - maxR - 4);
+      const y = rand(maxR + 4, viewH - maxR - 4);
+
+      // current difficulty growth speed (+/- small jitter)
+      const baseGrowth = growthSpeedPxPerSec(elapsedMs);
+      const growth = clamp(baseGrowth * rand(0.95, 1.08), MIN_GROWTH, MAX_GROWTH);
+
+      circles.push(new Circle(x, y, maxR, growth));
+    }
+
+    // ----- Utility
+    function clamp(v, a, b){ return Math.min(b, Math.max(a, v)); }
+    function rand(a, b){ return a + Math.random()*(b-a); }
+    function dist2(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; }
+
+    // ----- Input (tap)
+    function handleTap(px, py){
+      if (state !== STATE.PLAYING) return;
+      // choose topmost (last drawn) circle under finger
+      for (let i = circles.length - 1; i >= 0; i--){
         const c = circles[i];
-        c.r += c.speed * (dt / 1000);
-        if (c.r >= c.rMax) {
-          // auto penalty
-          const pen = autoPenalty(c);
-          score = Math.max(0, Math.round(score + pen));
-          addFloatText(c.x, c.y, String(pen), false);
-          vibrate(50);
-          audio.buzz(120, 150);
-          flashDamage();
-          circles.splice(i, 1);
+        if (dist2(px, py, c.x, c.y) <= c.r * c.r){
+          const ratio = c.r / c.maxR;
+          if (ratio < DANGER_THRESHOLD){
+            // reward decays linearly to 0 at 80%
+            const s = ratio / DANGER_THRESHOLD; // 0..1
+            const reward = Math.max(0, Math.round(c.baseReward * (1 - s)));
+            if (reward > 0) applyScore(reward, c.x, c.y);
+            else applyScore(0, c.x, c.y);
+          } else if (ratio <= 1.0){
+            // penalty grows 0 -> baseReward between 80% and 100%
+            const over = (ratio - DANGER_THRESHOLD) / (1 - DANGER_THRESHOLD); // 0..1
+            const penalty = Math.round(c.baseReward * over);
+            applyScore(-penalty, c.x, c.y);
+          } else {
+            // oversized (shouldn't happen because auto-penalty removes)
+            applyScore(-c.baseReward, c.x, c.y);
+          }
+          circles.splice(i,1);
+          return;
         }
       }
-      if (score <= 0) endGame();
+      // (no penalty for tapping empty space)
     }
 
-    // Render circles
-    for (const c of circles) {
-      const ratio = Math.min(1, c.r / c.rMax);
-      const col = colorForRatio(ratio);
-      // soft glow
-      ctx.beginPath();
-      ctx.fillStyle = col;
-      ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-      ctx.fill();
+    // pointer listeners (mouse + touch)
+    canvas.addEventListener('pointerdown', (e)=>{
+      const rect = canvas.getBoundingClientRect();
+      handleTap((e.clientX - rect.left), (e.clientY - rect.top));
+    }, {passive:true});
 
-      // subtle outline
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-      ctx.stroke();
+    // ----- State transitions
+    function startGame(){
+      initAudio(); // unlock on user gesture
+      resetGameValues();
+      state = STATE.PLAYING;
+      startOverlay.classList.add('hidden');
+      pauseOverlay.classList.add('hidden');
+      gameOverOverlay.classList.add('hidden');
+      lastTs = performance.now();
+      requestAnimationFrame(tick);
+    }
+    function pauseGame(){
+      if (state !== STATE.PLAYING) return;
+      state = STATE.PAUSED;
+      pauseOverlay.classList.remove('hidden');
+    }
+    function resumeGame(){
+      if (state !== STATE.PAUSED) return;
+      state = STATE.PLAYING;
+      pauseOverlay.classList.add('hidden');
+      lastTs = performance.now(); // reset delta to avoid spike
+      requestAnimationFrame(tick);
+    }
+    function endGame(){
+      if (state === STATE.GAMEOVER) return;
+      state = STATE.GAMEOVER;
+      finalScoreEl.textContent = `Score: ${Math.floor(score)}`;
+      if (score >= high){
+        newHighBanner.classList.remove('hidden');
+      } else {
+        newHighBanner.classList.add('hidden');
+      }
+      gameOverOverlay.classList.remove('hidden');
+    }
+    function backToStart(){
+      state = STATE.START;
+      startOverlay.classList.remove('hidden');
+      pauseOverlay.classList.add('hidden');
+      gameOverOverlay.classList.add('hidden');
+      // keep high score, keep mute
+    }
+    function restartGame(){
+      resetGameValues();
+      state = STATE.PLAYING;
+      pauseOverlay.classList.add('hidden');
+      gameOverOverlay.classList.add('hidden');
+      lastTs = performance.now();
+      requestAnimationFrame(tick);
     }
 
-    // Floating texts
-    for (let i = floatTexts.length - 1; i >= 0; i--) {
-      const f = floatTexts[i];
-      f.t += dt;
-      const a = 1 - (f.t / f.ttl);
-      if (a <= 0) { floatTexts.splice(i, 1); continue; }
-      const y = f.y - (f.t / f.ttl) * 40;
-      drawFloatingText(f.text, f.x, y, f.good ? 'var(--good)' : 'var(--bad)', a);
+    // Buttons
+    startBtn.addEventListener('click', startGame);
+    pauseBtn.addEventListener('click', pauseGame);
+    resumeBtn.addEventListener('click', resumeGame);
+    pmRestartBtn.addEventListener('click', restartGame);
+    backToStartBtn.addEventListener('click', backToStart);
+    restartBtn.addEventListener('click', restartGame);
+    muteToggleBtn.addEventListener('click', ()=>{ isMuted = !isMuted; saveMuted(isMuted); updateHud(); });
+    // tap the mute icon text as well
+    muteIcon.addEventListener('click', ()=>{ isMuted = !isMuted; saveMuted(isMuted); updateHud(); });
+
+    // ----- Main loop
+    function tick(ts){
+      const dt = Math.min(0.05, (ts - lastTs) / 1000); // cap delta at 50ms
+      lastTs = ts;
+
+      if (state === STATE.PLAYING){
+        elapsedMs += dt * 1000;
+        timeSinceSpawnMs += dt * 1000;
+
+        // survival drain
+        score -= SURVIVAL_LOSS_PER_SEC * dt;
+        if (score <= 0){ score = 0; updateHud(); endGame(); return; }
+        // live high score
+        if (score > high){ high = score; saveHigh(high); }
+        updateHud();
+
+        // spawn logic
+        const maxC = maxCirclesAllowed(elapsedMs);
+        let nextInterval = spawnIntervalMs(elapsedMs);
+        // spawn as needed if interval passed
+        while (timeSinceSpawnMs >= nextInterval && circles.length < maxC){
+          spawnCircle();
+          timeSinceSpawnMs -= nextInterval;
+          nextInterval = spawnIntervalMs(elapsedMs); // recalc (stays similar)
+        }
+
+        // update circles
+        for (let i = circles.length-1; i>=0; i--){
+          if (circles[i].update(dt)){
+            circles.splice(i,1);
+          }
+        }
+      }
+
+      // draw
+      draw(dt);
+
+      if (state === STATE.PLAYING){
+        requestAnimationFrame(tick);
+      }
     }
 
-    requestAnimationFrame(step);
-  }
+    function draw(dt){
+      // clear bg (transparent, we rely on body gradient), but we need to clear canvas
+      ctx.clearRect(0,0,viewW, viewH);
 
-  function drawFloatingText(text, x, y, colorVar, alpha) {
-    // Use DOM for crisp text positioning above canvas
-    let el = document.createElement('div');
-    el.className = 'float';
-    el.textContent = text;
-    el.style.left = (x - 10) + 'px';
-    el.style.top = (y - 10) + 'px';
-    el.style.color = getComputedStyle(document.documentElement).getPropertyValue(colorVar.replace('var','')).trim() || (colorVar.includes('good') ? '#3ad29f' : '#ff5964');
-    el.style.opacity = alpha;
-    floatLayer.appendChild(el);
-    // Schedule removal right away after browser paints (we re-create each frame)
-    queueMicrotask(() => { if (el.parentNode) el.parentNode.removeChild(el); });
-  }
+      // draw circles
+      for (let i=0;i<circles.length;i++){
+        circles[i].draw(ctx);
+      }
 
-  function startGame() {
-    audio.init(); // unlock audio from user gesture
-    score = START_SCORE;
-    scoreEl.textContent = score;
-    elapsed = 0;
-    spawnAccumulator = 0;
-    lastFrameTime = 0;
-    circles.length = 0;
-    floatTexts.length = 0;
-    gameState = STATE.RUN;
-    startOverlay.classList.remove('show');
-    pauseOverlay.classList.remove('show');
-    gameOverOverlay.classList.remove('show');
-  }
+      // effects
+      drawRipples(dt);
+      drawFloaters(dt);
+    }
 
-  function pauseGame() {
-    if (gameState !== STATE.RUN) return;
-    gameState = STATE.PAUSE;
-    pauseOverlay.classList.add('show');
-  }
+    // ----- Init
+    function boot(){
+      isMuted = loadMuted();
+      updateHud();
+      resizeCanvas();
+      state = STATE.START;
+      startOverlay.classList.remove('hidden');
+      // small warm-up draw
+      draw(0);
+    }
+    window.addEventListener('load', boot, {once:true});
 
-  function resumeGame() {
-    if (gameState !== STATE.PAUSE) return;
-    gameState = STATE.RUN;
-    lastFrameTime = 0; // avoid time jump
-    pauseOverlay.classList.remove('show');
-  }
+    // Prevent iOS double-tap zoom on controls
+    ;['startBtn','resumeBtn','pmRestartBtn','backToStartBtn','pauseBtn','restartBtn','playAgainBtn','goStartBtn','muteToggleBtn'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el){
+        el.addEventListener('touchend', ()=>{}, {passive:true});
+      }
+    });
 
-  function restartGame() {
-    startGame();
-  }
-
-  function endGame() {
-    if (gameState === STATE.OVER) return;
-    gameState = STATE.OVER;
-    finalScoreEl.textContent = score;
-    const beatHigh = score >= storage.high;
-    if (beatHigh) { storage.high = score; high = score; }
-    highEl.textContent = storage.high;
-    newHighEl.style.display = beatHigh ? 'block' : 'none';
-    gameOverOverlay.classList.add('show');
-  }
-
-  function backToStart() {
-    gameState = STATE.START;
-    circles.length = 0;
-    floatTexts.length = 0;
-    gameOverOverlay.classList.remove('show');
-    pauseOverlay.classList.remove('show');
-    startOverlay.classList.add('show');
-  }
-
-  // ======== Buttons ========
-  startBtn.addEventListener('click', startGame);
-  muteToggleStart.addEventListener('click', () => {
-    audio.init(); storage.mute = !storage.mute; audio.enabled = !storage.mute;
-  });
-  pauseBtn.addEventListener('click', pauseGame);
-  restartBtn.addEventListener('click', restartGame);
-  resumeBtn.addEventListener('click', resumeGame);
-  muteToggle.addEventListener('click', () => {
-    audio.init(); storage.mute = !storage.mute; audio.enabled = !storage.mute;
-  });
-  restartFromPauseBtn.addEventListener('click', () => { pauseOverlay.classList.remove('show'); restartGame(); });
-  backToStartBtn.addEventListener('click', backToStart);
-  backToStart2Btn.addEventListener('click', backToStart);
-  playAgainBtn.addEventListener('click', () => { gameOverOverlay.classList.remove('show'); restartGame(); });
-
-  // ======== Start loop ========
-  requestAnimationFrame(step);
-})();
-</script>
+    // Game Over buttons
+    document.getElementById('playAgainBtn').addEventListener('click', ()=>{
+      gameOverOverlay.classList.add('hidden');
+      restartGame();
+    });
+    document.getElementById('goStartBtn').addEventListener('click', backToStart);
+  </script>
 </body>
 </html>
