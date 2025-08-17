@@ -1,247 +1,690 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Circle Tap Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      touch-action: manipulation;
-    }
-    #top-bar {
-      position: absolute;
-      top: 0;
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 15px;
-      font-size: 20px;
-      background: rgba(0, 0, 0, 0.4);
-    }
-    #bottom-bar {
-      position: absolute;
-      bottom: 0;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      padding: 15px;
-      background: rgba(0, 0, 0, 0.4);
-    }
-    button {
-      font-size: 18px;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 6px;
-      background: #444;
-      color: white;
-    }
-    #pause-overlay {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-      color: white;
-      z-index: 10;
-      visibility: hidden;
-    }
-    #pause-overlay button {
-      margin-top: 20px;
-      font-size: 22px;
-    }
-    canvas {
-      display: block;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Growth Tap — Prototype</title>
+<style>
+  :root{
+    --bg-top:#0b1220;
+    --bg-bottom:#121826;
+    --panel-bg: rgba(255,255,255,0.04);
+    --accent: #ffd166;
+    --score-color: #fff;
+    --highscore-color: #ffd166;
+    --ui-height: 56px;
+    --touch-target: 44px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{
+    height:100%;
+    margin:0;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-tap-highlight-color: transparent;
+    background: linear-gradient(180deg,var(--bg-top),var(--bg-bottom));
+    color:var(--score-color);
+    display:flex;
+    align-items:stretch;
+    justify-content:center;
+  }
+  #app {
+    width:100%;
+    max-width:900px;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* Top bar */
+  .topbar{
+    height:var(--ui-height);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 14px;
+    box-sizing:border-box;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    backdrop-filter: blur(6px);
+    z-index:40;
+  }
+  .score, .highscore{
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+  .highscore { color: var(--highscore-color); font-size:0.92rem; }
+  .score { font-size:1.05rem; }
+
+  /* Canvas container grows */
+  .play-area {
+    flex:1;
+    position:relative;
+  }
+  canvas {
+    width:100%;
+    height:100%;
+    display:block;
+    touch-action: none;
+  }
+
+  /* Bottom bar */
+  .bottombar{
+    height:var(--ui-height);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 14px;
+    box-sizing:border-box;
+    gap:8px;
+    z-index:40;
+  }
+  .btn {
+    min-height:var(--touch-target);
+    min-width:88px;
+    padding:8px 12px;
+    border-radius:12px;
+    background:var(--panel-bg);
+    color:var(--score-color);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    user-select:none;
+  }
+  .btn.primary{
+    background: linear-gradient(180deg,#2ee6a7,#1bb782);
+    color:#062017;
+  }
+
+  /* Center overlays */
+  .overlay {
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:80;
+  }
+  .panel {
+    width:92%;
+    max-width:420px;
+    padding:18px;
+    border-radius:14px;
+    text-align:center;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    color:var(--score-color);
+  }
+  .title {
+    font-size:1.6rem;
+    font-weight:800;
+    margin-bottom:8px;
+  }
+  .muted { color: rgba(255,255,255,0.7); font-size:0.95rem; margin-bottom:12px; }
+
+  /* Floating point bubbles */
+  .float {
+    position:absolute;
+    pointer-events:none;
+    font-weight:800;
+    text-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    z-index:70;
+    will-change: transform, opacity;
+  }
+
+  /* small trophy */
+  .trophy { font-size:1.1rem; margin-left:6px; }
+
+  /* Pause overlay style */
+  .pause-overlay {
+    background: linear-gradient(0deg, rgba(2,6,10,0.6), rgba(2,6,10,0.4));
+    color:#fff;
+  }
+
+  /* Game over styles */
+  .gameover-score { font-size:2.4rem; font-weight:900; margin:8px 0; }
+  .small-muted { font-size:0.92rem; color:rgba(255,255,255,0.85); }
+  @media (min-width:420px){
+    .title { font-size:1.8rem; }
+  }
+</style>
 </head>
 <body>
-  <div id="top-bar">
-    <div>Score: <span id="score">1000</span></div>
-    <div>High: <span id="highscore">0</span></div>
+<div id="app" role="application" aria-label="Growth Tap Game">
+  <div class="topbar" id="topbar">
+    <div class="score" id="currentScore">Score: 1000</div>
+    <div class="highscore" id="highScore">High: 0</div>
   </div>
-  <canvas id="gameCanvas"></canvas>
-  <div id="bottom-bar">
-    <button id="pauseBtn">Pause</button>
-    <button id="restartBtn">Restart</button>
+
+  <div class="play-area" id="playArea">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Start screen -->
+    <div class="overlay" id="startScreen" style="z-index:90;">
+      <div class="panel">
+        <div class="title">Growth Tap</div>
+        <div class="muted">Tap circles before they grow — early taps give more points. Survive until your score hits 0.</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;">
+          <div class="btn primary" id="startBtn">Start</div>
+          <div class="btn" id="howBtn">How to</div>
+        </div>
+        <div style="margin-top:12px;color:rgba(255,255,255,0.65);font-size:0.9rem;">
+          Mobile-first prototype — swipe/tap friendly.
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause overlay -->
+    <div class="overlay pause-overlay" id="pauseOverlay" style="display:none;">
+      <div class="panel">
+        <div class="title">Game Paused</div>
+        <div class="muted">Take a breath — tap resume to continue.</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;">
+          <div class="btn primary" id="resumeBtn">Resume</div>
+          <div class="btn" id="restartBtnPaused">Restart</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game over overlay -->
+    <div class="overlay" id="gameOverScreen" style="display:none;">
+      <div class="panel" id="gameOverPanel">
+        <div class="title" id="finalText">Game Over</div>
+        <div class="gameover-score" id="finalScore">0</div>
+        <div id="newHigh" class="muted" style="display:none;">🏆 NEW HIGH SCORE!</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;">
+          <div class="btn primary" id="playAgainBtn">Play Again</div>
+          <div class="btn" id="homeBtn">Home</div>
+        </div>
+      </div>
+    </div>
+
   </div>
-  <div id="pause-overlay">
-    <div>Game Paused</div>
-    <button id="resumeBtn">Resume</button>
+
+  <div class="bottombar">
+    <div class="btn" id="pauseBtn">⏸ Pause</div>
+    <div class="btn" id="liveRestartBtn">🔄 Restart</div>
   </div>
+</div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-let width, height;
-function resize() {
-  width = canvas.width = window.innerWidth;
-  height = canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
+/*
+  Growth Tap — single-file prototype
+  - Uses canvas, requestAnimationFrame
+  - Touch + mouse input
+  - Difficulty scaling: spawn interval, growth speed, max concurrent circles
+  - Score drains 100 points/sec from starting 1000
+*/
 
-let score = 1000;
-let highscore = parseInt(localStorage.getItem("circleGameHighScore")) || 0;
-document.getElementById("highscore").textContent = highscore;
+(() => {
+  // ---- Config & State ----
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  const app = document.getElementById('app');
+  const playArea = document.getElementById('playArea');
 
-let elapsed = 0; // seconds
-let lastFrame = performance.now();
-let paused = false;
-let circles = [];
+  // UI elements
+  const currentScoreEl = document.getElementById('currentScore');
+  const highScoreEl = document.getElementById('highScore');
+  const startScreen = document.getElementById('startScreen');
+  const startBtn = document.getElementById('startBtn');
+  const howBtn = document.getElementById('howBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const liveRestartBtn = document.getElementById('liveRestartBtn');
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const restartBtnPaused = document.getElementById('restartBtnPaused');
+  const gameOverScreen = document.getElementById('gameOverScreen');
+  const finalScoreEl = document.getElementById('finalScore');
+  const finalText = document.getElementById('finalText');
+  const newHighEl = document.getElementById('newHigh');
+  const playAgainBtn = document.getElementById('playAgainBtn');
+  const homeBtn = document.getElementById('homeBtn');
 
-class Circle {
-  constructor() {
-    this.x = Math.random() * (width - 60) + 30;
-    this.y = Math.random() * (height - 160) + 80;
-    this.radius = 10;
-    this.maxRadius = 120;
-    this.growthRate = 20; // pixels/sec, will scale with difficulty
+  // Float container
+  const floatContainer = document.createElement('div');
+  floatContainer.style.position = 'absolute';
+  floatContainer.style.inset = '0';
+  floatContainer.style.pointerEvents = 'none';
+  playArea.appendChild(floatContainer);
+
+  // Canvas size handling (pixel ratio for crispness)
+  function resizeCanvas() {
+    const rect = playArea.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Save UI area height for spawn avoidance
+    uiTopHeight = document.querySelector('.topbar').offsetHeight;
+    uiBottomHeight = document.querySelector('.bottombar').offsetHeight;
   }
-  update(dt, growthScale) {
-    this.radius += this.growthRate * growthScale * dt;
-  }
-  draw() {
-    let color;
-    if (this.radius < 40) color = "white";
-    else if (this.radius < 70) color = "blue";
-    else if (this.radius < 100) color = "red";
-    else color = "black";
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-  contains(px, py) {
-    return Math.hypot(this.x - px, this.y - py) < this.radius;
-  }
-}
 
-canvas.addEventListener("touchstart", (e) => {
-  const touch = e.touches[0];
-  handleTap(touch.clientX, touch.clientY);
-});
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 120));
 
-canvas.addEventListener("mousedown", (e) => {
-  handleTap(e.clientX, e.clientY);
-});
+  // Game constants
+  const START_SCORE = 1000;
+  const SCORE_DRAIN_PER_SEC = 100; // -100 per second
+  const MIN_SPAWN_INTERVAL_MS = 400;
+  const INITIAL_SPAWN_INTERVAL_MS = 1500;
+  const GROWTH_START = 20; // px/sec
+  const GROWTH_MAX = 120; // px/sec
+  const GROWTH_RAMP_TIME_MS = 60_000; // 1 minute to ramp
+  const MAX_CIRCLES_LIMIT = 6;
+  const UI_PADDING = 10;
 
-function handleTap(x, y) {
-  for (let i = circles.length - 1; i >= 0; i--) {
-    if (circles[i].contains(x, y)) {
-      let c = circles[i];
-      let points = Math.max(10, 150 - c.radius); // smaller circle = more points
-      score += Math.floor(points);
-      circles.splice(i, 1);
+  // spawn avoidance heights (populated on resize)
+  let uiTopHeight = 56, uiBottomHeight = 56;
+
+  // Game dynamic state
+  let circles = []; // each: {id, x, y, radius, bornAt, growthRatePxPerSec, popped}
+  let nextSpawnAt = 0;
+  let lastFrame = performance.now();
+  let running = false;
+  let paused = false;
+  let elapsedSinceStart = 0; // ms
+  let score = START_SCORE;
+  let highScore = parseInt(localStorage.getItem('growthTap_high') || '0', 10) || 0;
+  highScoreEl.textContent = 'High: ' + highScore;
+  let floatIdCounter = 0;
+
+  // Input tracking
+  let ongoingTouches = {};
+
+  // Utility helpers
+  function rand(min, max){ return Math.random() * (max - min) + min; }
+  function now(){ return performance.now(); }
+
+  // Difficulty functions (as designed earlier)
+  function spawnIntervalMs(tMs){
+    // spawnInterval(t) = max(0.4s, 1.5s * e^{-0.0015 t})
+    const val = INITIAL_SPAWN_INTERVAL_MS * Math.exp(-0.0015 * tMs);
+    return Math.max(MIN_SPAWN_INTERVAL_MS, val);
+  }
+  function growthSpeedPxPerSec(tMs){
+    // linear ramp: 20 + (100 * t / 60,000), capped at GROWTH_MAX
+    const extra = (100 * (tMs / GROWTH_RAMP_TIME_MS));
+    return Math.min(GROWTH_MAX, GROWTH_START + extra);
+  }
+  function maxCirclesAt(tMs){
+    // min(6, floor(1 + log_{1.5}(1 + t/10,000)))
+    const x = 1 + tMs / 10000;
+    const logBase = Math.log(1.5);
+    const val = 1 + Math.log(x) / logBase;
+    return Math.min(MAX_CIRCLES_LIMIT, Math.floor(val));
+  }
+
+  // Visual helpers: color by radius
+  function circleColorByRadius(radius, maxRadius){
+    // thresholds relative to maxRadius (we'll set a "danger" radius)
+    // We'll map: small -> white, medium -> blue, large -> red, oversized -> black
+    const ratio = radius / maxRadius;
+    if (ratio < 0.4) return '#ffffff'; // small
+    if (ratio < 0.7) return '#4ea6ff'; // medium-blue
+    if (ratio < 1.0) return '#ff6b6b'; // red
+    return '#000000'; // penalty
+  }
+
+  // Create a circle
+  let circleIdSeq = 1;
+  function spawnCircle(nowMs){
+    // Determine growth speed from difficulty
+    const g = growthSpeedPxPerSec(elapsedSinceStart);
+    // A circle has a target "maxRadius" where it turns penalty if exceeded.
+    // We'll randomly pick a base target size depending on screen min dimension
+    const rect = canvas.getBoundingClientRect();
+    const minDim = Math.min(rect.width, rect.height);
+    const baseMaxR = Math.max(30, Math.floor(minDim * rand(0.08, 0.18))); // px
+    const maxRadius = baseMaxR;
+
+    // pick position avoiding top/bottom UI
+    const padding = Math.max(12, Math.round(minDim * 0.05));
+    const minY = uiTopHeight + padding;
+    const maxY = rect.height - uiBottomHeight - padding;
+    let x,y;
+    let attempts = 0;
+    do {
+      x = rand(padding, rect.width - padding);
+      y = rand(minY, maxY);
+      attempts++;
+    } while(overlapsUI(x,y) && attempts < 8);
+
+    const c = {
+      id: circleIdSeq++,
+      x, y,
+      radius: 8,
+      bornAt: nowMs,
+      growthRate: g, // px per sec
+      maxRadius,
+      popped: false,
+    };
+    circles.push(c);
+    // keep circles array trimmed to avoid runaway growth
+    circles = circles.slice(-50);
+  }
+
+  function overlapsUI(x,y){
+    // simple check so circles won't spawn too close to top/bottom bars
+    const rect = canvas.getBoundingClientRect();
+    if (y < uiTopHeight + 28) return true;
+    if (y > rect.height - uiBottomHeight - 28) return true;
+    return false;
+  }
+
+  // Check touches / clicks
+  function handleTap(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width / (window.devicePixelRatio || 1);
+    const scaleY = canvas.height / rect.height / (window.devicePixelRatio || 1);
+    // convert to canvas CSS coords (we used ctx transform for dpr, so here use CSS coords)
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    // search topmost circle under tap (largest index)
+    for (let i = circles.length - 1; i >= 0; i--){
+      const c = circles[i];
+      const dx = x - c.x, dy = y - c.y;
+      if (Math.sqrt(dx*dx + dy*dy) <= c.radius + 6) {
+        // hit
+        processPop(c);
+        return;
+      }
+    }
+    // Missed: small penalty (optional)
+    createFloatingText('-15', x, y, '#ffcccb');
+    score = Math.max(0, score - 15);
+  }
+
+  // Pop logic: score calculation by how early we pop relative to its maxRadius
+  function processPop(circle){
+    if (circle.popped) return;
+    circle.popped = true;
+    // compute ratio: 0 (small) -> 1 (at max radius)
+    const ratio = Math.min(1, circle.radius / circle.maxRadius);
+    // Points: early pop = more points (range approx 120 -> 20)
+    const points = Math.round(20 + (1 - ratio) * 100); // 20..120
+    score += points;
+    createFloatingText('+' + points, circle.x, circle.y - 8, '#d2ffd7');
+    // play pop animation: shrink quickly (we'll mark removed in render)
+    // mark radius negative to animate removal
+    circle.removedAt = now();
+  }
+
+  // Floating texts
+  function createFloatingText(text, x, y, color){
+    floatIdCounter++;
+    const el = document.createElement('div');
+    el.className = 'float';
+    el.style.left = (x) + 'px';
+    el.style.top = (y) + 'px';
+    el.style.color = color || '#fff';
+    el.style.fontSize = '16px';
+    el.style.opacity = '1';
+    el.style.transform = 'translate(-50%,0) translateY(0)';
+    el.textContent = text;
+    floatContainer.appendChild(el);
+
+    // animate using CSS-like JS timing
+    const start = now();
+    const dur = 900;
+    function tick(){
+      const t = (now() - start) / dur;
+      if (t >= 1) {
+        el.remove();
+        return;
+      }
+      el.style.transform = `translate(-50%,-${30 * t}px)`;
+      el.style.opacity = String(1 - t);
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Game loop
+  function gameLoop(ts){
+    if (!running || paused) {
+      lastFrame = ts;
+      requestAnimationFrame(gameLoop);
       return;
     }
+    const dt = Math.min(60, ts - lastFrame); // ms (cap small)
+    lastFrame = ts;
+    elapsedSinceStart += dt;
+
+    // score drain
+    score -= SCORE_DRAIN_PER_SEC * (dt / 1000);
+    if (score < 0) score = 0;
+
+    // spawn logic
+    const currentMaxCircles = maxCirclesAt(elapsedSinceStart);
+    if (circles.length < currentMaxCircles && ts >= nextSpawnAt) {
+      spawnCircle(ts);
+      nextSpawnAt = ts + spawnIntervalMs(elapsedSinceStart);
+    }
+
+    // update circles (growth + check oversize)
+    const toRemove = [];
+    for (const c of circles){
+      if (c.popped) {
+        // shrink & fade removed circles
+        if (!c.deadAnim) c.deadAnim = { start: now(), duration: 220 };
+        const t = (now() - c.deadAnim.start) / c.deadAnim.duration;
+        c.radius *= (1 - t);
+        if (t >= 1 || c.radius < 4) toRemove.push(c);
+        continue;
+      }
+      // grow
+      const growthPx = c.growthRate * (dt / 1000);
+      c.radius += growthPx;
+
+      // oversize -> penalty
+      if (c.radius > c.maxRadius * 1.05 && !c.oversizedAt) {
+        // mark oversized and penalize
+        c.oversizedAt = now();
+        score = Math.max(0, score - 80); // penalty for letting grow too long
+        createFloatingText('-80', c.x, c.y, '#ffb3b3');
+      }
+      // if huge, remove after short time
+      if (c.radius > c.maxRadius * 1.4) {
+        toRemove.push(c);
+      }
+    }
+    // remove flagged
+    circles = circles.filter(c => !toRemove.includes(c));
+
+    // update scoreboard UI
+    currentScoreEl.textContent = 'Score: ' + Math.max(0, Math.floor(score));
+    if (score > highScore){
+      highScore = Math.floor(score);
+      highScoreEl.textContent = 'High: ' + highScore;
+      localStorage.setItem('growthTap_high', String(highScore));
+    }
+
+    // check game over
+    if (score <= 0) {
+      endGame();
+      return;
+    }
+
+    // draw
+    render();
+
+    requestAnimationFrame(gameLoop);
   }
-}
 
-function spawnCircle() {
-  if (circles.length < maxCircles()) {
-    circles.push(new Circle());
-  }
-}
+  // Render function
+  function render(){
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
 
-function spawnInterval() {
-  // decreases as elapsed increases (down to ~0.6s)
-  return Math.max(0.6, 2.0 - 0.05 * Math.log(elapsed+1));
-}
+    // background subtle gradient (we rely on body background, canvas is transparent)
+    // draw circles
+    for (const c of circles){
+      // drop shadow & ring
+      ctx.save();
+      // shadow
+      ctx.beginPath();
+      ctx.fillStyle = circleColorByRadius(c.radius, c.maxRadius);
+      ctx.shadowColor = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
+      ctx.arc(c.x, c.y, Math.max(3, c.radius), 0, Math.PI*2);
+      ctx.fill();
+      ctx.closePath();
+      ctx.restore();
 
-function growthScale() {
-  // circle grows faster over time
-  return 1 + 0.02 * Math.log(elapsed+1);
-}
+      // inner glow / ring
+      const color = circleColorByRadius(c.radius, c.maxRadius);
+      ctx.beginPath();
+      ctx.lineWidth = Math.max(1, Math.min(8, c.radius * 0.09));
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.9;
+      ctx.arc(c.x, c.y, Math.max(3, c.radius), 0, Math.PI*2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
-function maxCircles() {
-  // increases gradually with time, capped at 6
-  return Math.min(6, 2 + Math.floor(elapsed/15));
-}
-
-let spawnTimer = 0;
-
-function update(dt) {
-  elapsed += dt;
-  // subtract score for survival timer
-  score -= 100 * dt;
-  if (score <= 0) {
-    score = 0;
-    gameOver();
-    return;
-  }
-  spawnTimer += dt;
-  if (spawnTimer >= spawnInterval()) {
-    spawnCircle();
-    spawnTimer = 0;
-  }
-  for (let i = circles.length-1; i >= 0; i--) {
-    circles[i].update(dt, growthScale());
-    if (circles[i].radius > circles[i].maxRadius) {
-      score -= 200; // penalty
-      circles.splice(i, 1);
+      // draw subtle size indicator (thin ring when near max)
+      if (c.radius > c.maxRadius * 0.6 && c.radius <= c.maxRadius * 1.05) {
+        const pct = (c.radius / c.maxRadius);
+        ctx.beginPath();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(0.35, (pct-0.6)) + ')';
+        ctx.arc(c.x, c.y, c.maxRadius, 0, Math.PI*2);
+        ctx.stroke();
+      }
     }
   }
-}
 
-function draw() {
-  ctx.clearRect(0, 0, width, height);
-  circles.forEach(c => c.draw());
-}
-
-function loop(timestamp) {
-  if (!paused) {
-    let dt = (timestamp - lastFrame) / 1000;
-    lastFrame = timestamp;
-    update(dt);
-    draw();
-    document.getElementById("score").textContent = Math.floor(score);
-    if (score > highscore) {
-      highscore = Math.floor(score);
-      localStorage.setItem("circleGameHighScore", highscore);
-      document.getElementById("highscore").textContent = highscore;
-    }
-  } else {
-    lastFrame = timestamp; // prevent time jump
+  // Game control
+  function startGame(){
+    // reset
+    circles = [];
+    elapsedSinceStart = 0;
+    nextSpawnAt = now() + 350;
+    lastFrame = now();
+    circleIdSeq = 1;
+    score = START_SCORE;
+    running = true;
+    paused = false;
+    startScreen.style.display = 'none';
+    pauseOverlay.style.display = 'none';
+    gameOverScreen.style.display = 'none';
+    currentScoreEl.textContent = 'Score: ' + score;
+    requestAnimationFrame(gameLoop);
   }
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
 
-function gameOver() {
-  paused = true;
-  document.getElementById("pause-overlay").style.visibility = "visible";
-  document.getElementById("pause-overlay").firstChild.textContent = "Game Over";
-}
+  function pauseGame(){
+    paused = true;
+    pauseOverlay.style.display = 'flex';
+  }
+  function resumeGame(){
+    paused = false;
+    pauseOverlay.style.display = 'none';
+    lastFrame = now();
+  }
+  function restartGame(){
+    startGame();
+  }
 
-document.getElementById("pauseBtn").addEventListener("click", () => {
-  paused = true;
-  document.getElementById("pause-overlay").style.visibility = "visible";
-  document.getElementById("pause-overlay").firstChild.textContent = "Game Paused";
-});
-document.getElementById("resumeBtn").addEventListener("click", () => {
-  paused = false;
-  document.getElementById("pause-overlay").style.visibility = "hidden";
-});
-document.getElementById("restartBtn").addEventListener("click", restart);
+  function endGame(){
+    running = false;
+    paused = false;
+    // show final score
+    gameOverScreen.style.display = 'flex';
+    finalScoreEl.textContent = Math.floor(score);
+    if (Math.floor(score) >= (parseInt(localStorage.getItem('growthTap_high') || '0'))){
+      newHighEl.style.display = 'block';
+      finalText.textContent = 'Well done!';
+      // ensure stored
+      localStorage.setItem('growthTap_high', String(Math.floor(score)));
+      highScoreEl.textContent = 'High: ' + Math.floor(score);
+    } else {
+      newHighEl.style.display = 'none';
+      finalText.textContent = 'Game Over';
+    }
+  }
 
-function restart() {
-  score = 1000;
-  elapsed = 0;
-  circles = [];
-  spawnTimer = 0;
-  paused = false;
-  document.getElementById("pause-overlay").style.visibility = "hidden";
-}
+  // Event wiring
+  startBtn.addEventListener('click', () => startGame());
+  howBtn.addEventListener('click', () => {
+    alert('Tap circles before they grow — early taps give more points. Score drains by 100 points/sec. Pause with the button below.');
+  });
+  pauseBtn.addEventListener('click', () => {
+    if (!running) return;
+    pauseGame();
+  });
+  liveRestartBtn.addEventListener('click', () => {
+    restartGame();
+  });
+  resumeBtn.addEventListener('click', () => {
+    resumeGame();
+  });
+  restartBtnPaused.addEventListener('click', () => {
+    restartGame();
+  });
+  playAgainBtn.addEventListener('click', () => {
+    restartGame();
+  });
+  homeBtn.addEventListener('click', () => {
+    // show start screen again
+    startScreen.style.display = 'flex';
+    gameOverScreen.style.display = 'none';
+  });
+
+  // touch / pointer handling (supports mouse too)
+  function initInput(){
+    // Use pointer events if supported
+    function pointerDown(e){
+      if (!running || paused) return;
+      e.preventDefault();
+      // allow multi-touch: handle only primary or all? We'll just handle event coordinates
+      const rect = canvas.getBoundingClientRect();
+      handleTap(e.clientX, e.clientY);
+    }
+    canvas.addEventListener('pointerdown', pointerDown);
+    // also support touchstart fallback for older browsers
+    canvas.addEventListener('touchstart', (ev) => {
+      if (!running || paused) return;
+      ev.preventDefault();
+      for (const t of ev.changedTouches){
+        handleTap(t.clientX, t.clientY);
+      }
+    }, { passive:false });
+
+    // mouse fallback
+    canvas.addEventListener('mousedown', (ev) => {
+      if (!running || paused) return;
+      handleTap(ev.clientX, ev.clientY);
+    });
+  }
+
+  // initialize canvas + input
+  resizeCanvas();
+  initInput();
+
+  // initial render tick to show empty canvas
+  render();
+
+  // small UX: show a quick hint floating on start
+  startBtn.addEventListener('click', () => {
+    createFloatingText('Good luck!', window.innerWidth/2, window.innerHeight/2, '#fff');
+  });
+
+  // Make sure high score is displayed
+  highScoreEl.textContent = 'High: ' + highScore;
+
+  // prevent overscroll on mobile
+  document.body.addEventListener('touchmove', (e) => {
+    if (running) e.preventDefault();
+  }, { passive:false });
+
+})();
 </script>
 </body>
 </html>
