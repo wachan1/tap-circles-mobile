@@ -257,8 +257,8 @@
       return Math.max(400, 1500 * Math.exp(-0.0015 * (t)));
     }
     function growthSpeedPxPerSec(t){
-      // 20 + 100 * t/60000 cap 100
-      return Math.min(100, 20 + 100 * (t / 60000));
+      // 20 + 100 * t/60000 cap 50
+      return Math.min(50, 20 + 100 * (t / 60000));
     }
     function maxCirclesAllowed(t){
       // floor(1 + log_{1.5}(1 + t/10000)) <= 6
@@ -268,7 +268,7 @@
 
     // Visual thresholds
     const DANGER_THRESHOLD = 0.80; // 80%
-    const MIN_GROWTH = 20; // px/s
+    const MIN_GROWTH = 40; // px/s
     const MAX_GROWTH = 100; // px/s
 
     // Tuning knobs added
