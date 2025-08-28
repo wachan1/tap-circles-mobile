@@ -295,13 +295,16 @@
     const SPAWN_START_MS = 1600;
     const SPAWN_DECAY    = 0.005;
 
+    // Growth speed
+    const GROWTH_SPEED = 75;
+
     // Difficulty scaling (time t in ms)
     function spawnIntervalMs(t){
       return Math.max(SPAWN_FLOOR_MS, SPAWN_START_MS * Math.exp(-SPAWN_DECAY * t));
     }
     function growthSpeedPxPerSec(t){
-      // 20 + 100 * t/60000 cap 50
-      return Math.min(50, 20 + 100 * (t / 60000));
+      // 20 + 100 * t/60000 cap 75
+      return Math.min(GROWTH_SPEED, 20 + 100 * (t / 60000));
     }
     function maxCirclesAllowed(t){
       // Piecewise: very low cap early, then open up
@@ -309,7 +312,7 @@
       if (t < 20000) return 3;            // 10–20s: at most 3
       if (t < 30000) return 5;            // 20–30s: 5
       const val = 1 + (Math.log(1 + t/10000) / Math.log(SPAWN_SPEED));
-      return Math.min(11, Math.max(4, Math.floor(val)));
+      return Math.min(7, Math.max(4, Math.floor(val)));
     }
     function canPlaceCircle(x, y, maxR){
       // stay inside bounds (you already factor margins when sampling,
@@ -436,7 +439,7 @@
         this.r += this.growth * dt;
         if (this.r >= this.maxR){
           // auto penalty and remove
-          applyScore(-Math.round(this.baseReward * 0.85), this.x, this.y, true);
+          applyScore(-Math.round(this.baseReward), this.x, this.y, true);
           addFloater('Late!', this.x, this.y - 20, 'rgba(255,77,79,0.95)');
           return true; // remove
         }
@@ -628,9 +631,9 @@
             const reward = Math.max(MIN_TAP_REWARD, Math.round(c.baseReward * (1 - s)));
             applyScore(reward, c.x, c.y);
           } else if (ratio <= 1.0){
-            // softer penalty in red zone: 0 -> 0.8x baseReward between 80%-100%
+            // penalty in red zone: 0 -> 1x baseReward between 80%-100%
             const over = (ratio - DANGER_THRESHOLD) / (1 - DANGER_THRESHOLD); // 0..1
-            const penalty = Math.round(0.8 * c.baseReward * over);
+            const penalty = Math.round(c.baseReward * over);
             applyScore(-penalty, c.x, c.y);
           } else {
             // oversized fallback (shouldn't happen)
