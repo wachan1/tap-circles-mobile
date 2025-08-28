@@ -284,7 +284,7 @@
     const SURVIVAL_LOSS_PER_SEC = 100;
 
     // Simultaneous circle spawns speed
-    const SPAWN_SPEED = 1.05;
+    const SPAWN_SPEED = 1.35;
 
     // Spawn interval parameters
     const SPAWN_FLOOR_MS = 200;
@@ -305,7 +305,7 @@
       if (t < 20000) return 3;            // 10–20s: at most 3
       if (t < 30000) return 5;            // 20–30s: 5
       const val = 1 + (Math.log(1 + t/10000) / Math.log(SPAWN_SPEED));
-      return Math.min(8, Math.max(4, Math.floor(val)));
+      return Math.min(11, Math.max(4, Math.floor(val)));
     }
 
     // Visual thresholds
@@ -415,8 +415,8 @@
         this.pulse += dt * 6;
         this.r += this.growth * dt;
         if (this.r >= this.maxR){
-          // auto penalty and remove (softer: 0.25x instead of 0.5x)
-          applyScore(-Math.round(this.baseReward * 0.25), this.x, this.y, true);
+          // auto penalty and remove
+          applyScore(-Math.round(this.baseReward * 0.85), this.x, this.y, true);
           addFloater('Late!', this.x, this.y - 20, 'rgba(255,77,79,0.95)');
           return true; // remove
         }
