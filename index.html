@@ -280,8 +280,12 @@
     // ----- Game constants (design-driven)
     const START_SCORE = 1000;
 
-    // passive drain
+    // Passive drain
     const SURVIVAL_LOSS_PER_SEC = 100;
+
+    // Circle spawn parameters
+    const SAFE_GAP = 6;          // extra pixels between max radii so circles never touch
+    const MAX_SPAWN_TRIES = 24;  // how many random attempts before giving up this frame
 
     // Simultaneous circle spawns speed
     const SPAWN_SPEED = 1.35;
@@ -306,6 +310,22 @@
       if (t < 30000) return 5;            // 20–30s: 5
       const val = 1 + (Math.log(1 + t/10000) / Math.log(SPAWN_SPEED));
       return Math.min(11, Math.max(4, Math.floor(val)));
+    }
+    function canPlaceCircle(x, y, maxR){
+      // stay inside bounds (you already factor margins when sampling,
+      // this is a safety check)
+      if (x - maxR < 0 || x + maxR > viewW || y - maxR < 0 || y + maxR > viewH) return false;
+    
+      const needed2 = (maxR + SAFE_GAP);
+      const needed2Sq = needed2 * needed2;
+      // Ensure distance(new, existing) >= (new.maxR + existing.maxR + SAFE_GAP)
+      for (let i = 0; i < circles.length; i++){
+        const c = circles[i];
+        const req = maxR + c.maxR + SAFE_GAP;
+        const dx = x - c.x, dy = y - c.y;
+        if (dx*dx + dy*dy < req * req) return false;
+      }
+      return true;
     }
 
     // Visual thresholds
@@ -549,21 +569,43 @@
     }
 
     function spawnCircle(){
-      // choose max radius relative to viewport size for variety (with explicit min/max caps)
       const viewMin = Math.min(viewW, viewH);
-      const minMaxR = Math.max(MIN_MAX_RADIUS, viewMin * 0.09);
-      const maxMaxR = Math.max(MAX_MAX_RADIUS, viewMin * 0.16);
-      const maxR = rand(minMaxR, Math.min(maxMaxR, viewMin * 0.20));
-
-      // position within safe bounds
-      const x = rand(maxR + 4, viewW - maxR - 4);
-      const y = rand(maxR + 4, viewH - maxR - 4);
-
+    
+      // your existing targets, feel free to keep/tweak
+      let minMaxR = Math.max(MIN_MAX_RADIUS, viewMin * 0.09);
+      let maxMaxR = Math.max(MAX_MAX_RADIUS, viewMin * 0.16);
+    
+      // pick a desired size first
+      let targetMaxR = rand(minMaxR, Math.min(maxMaxR, viewMin * 0.20));
+    
       // current difficulty growth speed (+/- small jitter)
       const baseGrowth = growthSpeedPxPerSec(elapsedMs);
       const growth = clamp(baseGrowth * rand(0.95, 1.08), MIN_GROWTH, MAX_GROWTH);
-
-      circles.push(new Circle(x, y, maxR, growth));
+    
+      // Try to place without overlapping others' max radii
+      let placed = false, foundX = 0, foundY = 0, foundR = targetMaxR;
+    
+      for (let tries = 0; tries < MAX_SPAWN_TRIES && !placed; tries++){
+        // every 8 tries, allow a small shrink to help packing when busy
+        if (tries === 8)  foundR = Math.max(minMaxR * 0.9, targetMaxR * 0.9);
+        if (tries === 16) foundR = Math.max(minMaxR * 0.8, targetMaxR * 0.8);
+    
+        const x = rand(foundR + 4, viewW - foundR - 4);
+        const y = rand(foundR + 4, viewH - foundR - 4);
+    
+        if (canPlaceCircle(x, y, foundR)){
+          foundX = x; foundY = y;
+          placed = true;
+          break;
+        }
+      }
+    
+      if (!placed){
+        // Couldn’t fit a circle cleanly this frame; skip to avoid unfair overlaps
+        return;
+      }
+    
+      circles.push(new Circle(foundX, foundY, foundR, growth));
     }
 
     // ----- Utility
