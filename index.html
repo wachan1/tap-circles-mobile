@@ -37,16 +37,43 @@
     /* HUD (top) */
     #hud{
       position:fixed; top:0; left:0; right:0; height:var(--hudH);
-      display:flex; align-items:center; justify-content:space-between;
+      display:grid;
+      grid-template-columns: 1fr auto 1fr; /* left (score), center (time), right (high) */
+      align-items:center;
       padding:0 14px;
       background:linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.10));
       backdrop-filter: blur(6px);
       z-index:10;
       gap:12px;
     }
-    #score{ font-weight:800; font-size:16px; letter-spacing:.3px; }
-    #high{ font-weight:700; font-size:10px; color:var(--accent); }
-    #time{ font-size:10px; color:var(--muted); font-weight:700; }
+    
+    /* Numbers shouldn’t jiggle: use tabular figures and no-wrap */
+    #score, #high, #time{
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    
+    /* Reserve enough width so 5–6 digits won’t push layout */
+    #score{
+      font-weight:800; font-size:20px; letter-spacing:.3px;
+      justify-self:start;
+      min-width: 13ch;   /* fits 'Score: 999,999' */
+      text-align:left;
+    }
+    #high{
+      font-weight:700; font-size:16px; color:var(--accent);
+      justify-self:end;
+      min-width: 12ch;   /* fits 'High: 999,999' */
+      text-align:right;
+    }
+    
+    /* Center stays flexible */
+    #time{ font-size:14px; color:var(--muted); font-weight:700; }
+    
+    /* When numbers get big, auto-compact fonts a bit */
+    #hud.compact #score{ font-size:18px; }
+    #hud.compact #high{ font-size:14px; }
+    #hud.compact #time{ font-size:12px; }
 
     /* Controls (bottom) */
     #controls{
@@ -272,7 +299,7 @@
     const MAX_GROWTH = 100; // px/s
 
     // Tuning knobs added
-    const MIN_TAP_REWARD = 20;      // floor for small-but-not-zero reward on early taps
+    const MIN_TAP_REWARD = 100;      // floor for small-but-not-zero reward on early taps
     const HITBOX_PAD = 18;          // easier taps (was +8)
     const MIN_MAX_RADIUS = 40;
     const MAX_MAX_RADIUS = 70;
@@ -364,7 +391,7 @@
         this.r = Math.max(6, Math.min(12, maxR * 0.16));
         this.maxR = maxR;
         this.growth = growth; // px/sec
-        // more generous base reward (was 100*(growth/MIN_GROWTH)+100)
+        // more generous base reward (was 160*(growth/MIN_GROWTH)+160)
         this.baseReward = Math.round(160 * (this.growth / MIN_GROWTH) + 160);
         // visual pulse phase
         this.pulse = Math.random() * Math.PI * 2;
