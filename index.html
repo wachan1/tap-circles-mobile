@@ -300,9 +300,12 @@
       return Math.min(50, 20 + 100 * (t / 60000));
     }
     function maxCirclesAllowed(t){
-      // floor(1 + log_{1.5}(1 + t/10000)) <= 6
+      // Piecewise: very low cap early, then open up
+      if (t < 10000) return 1;            // first 10s: only 1 circle
+      if (t < 20000) return 3;            // 10–20s: at most 3
+      if (t < 30000) return 5;            // 20–30s: 5
       const val = 1 + (Math.log(1 + t/10000) / Math.log(SPAWN_SPEED));
-      return Math.min(10, Math.max(1, Math.floor(val)));
+      return Math.min(8, Math.max(4, Math.floor(val)));
     }
 
     // Visual thresholds
@@ -311,7 +314,7 @@
     const MAX_GROWTH = 100; // px/s
 
     // Tuning knobs added
-    const MIN_TAP_REWARD = 100;      // floor for small-but-not-zero reward on early taps
+    const MIN_TAP_REWARD = 50;      // floor for small-but-not-zero reward on early taps
     const HITBOX_PAD = 18;          // easier taps (was +8)
     const MIN_MAX_RADIUS = 40;
     const MAX_MAX_RADIUS = 70;
