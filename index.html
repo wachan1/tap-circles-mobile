@@ -46,7 +46,7 @@
     }
     #score{ font-weight:800; font-size:20px; letter-spacing:.3px; }
     #high{ font-weight:700; font-size:16px; color:var(--accent); }
-    #time{ font-size:14px; color:var(--muted); font-weight:700; }
+    #time{ font-size:10px; color:var(--muted); font-weight:700; }
 
     /* Controls (bottom) */
     #controls{
@@ -271,8 +271,8 @@
     // Tuning knobs added
     const MIN_TAP_REWARD = 20;      // floor for small-but-not-zero reward on early taps
     const HITBOX_PAD = 18;          // easier taps (was +8)
-    const MIN_MAX_RADIUS = 80;      // bigger circles overall
-    const MAX_MAX_RADIUS = 150;
+    const MIN_MAX_RADIUS = 40;
+    const MAX_MAX_RADIUS = 70;
 
     // ----- Audio (negative feedback), created on first Start
     let audioCtx = null;
@@ -342,6 +342,7 @@
     let state = STATE.START;
 
     let score = START_SCORE;
+    let sessionPeak = START_SCORE;
     let high = loadHigh();
     let bestTimeMs = loadBestTimeMs();
     let elapsedMs = 0; // advances only during PLAYING
@@ -454,6 +455,7 @@
 
     function applyScore(delta, x, y, isAuto=false){
       score = Math.max(0, score + delta);
+      if (score > sessionPeak) sessionPeak = score;
       if (delta >= 0){
         addFloater('+'+delta, x, y-8, 'rgba(51,209,122,0.95)');
         addRipple(x,y);
@@ -492,6 +494,7 @@
 
     function resetGameValues(){
       score = START_SCORE;
+      sessionPeak = START_SCORE;
       elapsedMs = 0;
       timeSinceSpawnMs = 0;
       circles.length = 0;
@@ -590,7 +593,7 @@
     function endGame(){
       if (state === STATE.GAMEOVER) return;
       state = STATE.GAMEOVER;
-      finalScoreEl.textContent = `Score: ${Math.floor(score)}`;
+      finalScoreEl.textContent = `Best This Run: ${Math.floor(sessionPeak)}`;
 
       // compute this run's survival time
       const sessionMs = elapsedMs;
@@ -603,10 +606,10 @@
 
       // fill the Game Over panel time fields
       if (finalTimeEl) finalTimeEl.textContent = `Time: ${fmtMs(sessionMs)}`;
-      if (bestTimeEl)  bestTimeEl.textContent  = `Best: ${fmtMs(bestTimeMs)}`;
+      //if (bestTimeEl)  bestTimeEl.textContent  = `Best: ${fmtMs(bestTimeMs)}`;
 
       // score high banner
-      if (score >= high){
+      if (sessionPeak >= high){
         newHighBanner.classList.remove('hidden');
       } else {
         newHighBanner.classList.add('hidden');
