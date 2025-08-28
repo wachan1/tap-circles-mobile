@@ -353,7 +353,7 @@
         this.r += this.growth * dt;
         if (this.r >= this.maxR){
           // auto penalty and remove
-          applyScore(-this.baseReward, this.x, this.y, true);
+          applyScore(-Math.round(this.baseReward * 0.5), this.x, this.y, true);
           addFloater('Late!', this.x, this.y - 20, 'rgba(255,77,79,0.95)');
           return true; // remove
         }
@@ -476,8 +476,8 @@
 
     function spawnCircle(){
       // choose max radius relative to viewport size for variety
-      const minMaxR = Math.max(26, Math.min(viewW, viewH) * 0.06);
-      const maxMaxR = Math.max(44, Math.min(viewW, viewH) * 0.12);
+      const minMaxR = Math.max(40, Math.min(viewW, viewH) * 0.06);
+      const maxMaxR = Math.max(70, Math.min(viewW, viewH) * 0.12);
       const maxR = rand(minMaxR, maxMaxR);
 
       // position within safe bounds
@@ -514,7 +514,7 @@
           } else if (ratio <= 1.0){
             // penalty grows 0 -> baseReward between 80% and 100%
             const over = (ratio - DANGER_THRESHOLD) / (1 - DANGER_THRESHOLD); // 0..1
-            const penalty = Math.round(c.baseReward * over);
+            const penalty = Math.round(0.5 * c.baseReward * over);
             applyScore(-penalty, c.x, c.y);
           } else {
             // oversized (shouldn't happen because auto-penalty removes)
