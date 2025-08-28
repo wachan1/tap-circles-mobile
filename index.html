@@ -286,10 +286,14 @@
     // Simultaneous circle spawns speed
     const SPAWN_SPEED = 1.05;
 
+    // Spawn interval parameters
+    const SPAWN_FLOOR_MS = 250;
+    const SPAWN_START_MS = 1600;
+    const SPAWN_DECAY    = 0.0032;
+
     // Difficulty scaling (time t in ms)
     function spawnIntervalMs(t){
-      // 1.5s * e^(-0.0015 t) -> min 0.4s
-      return Math.max(400, 1500 * Math.exp(-0.0015 * (t)));
+      return Math.max(SPAWN_FLOOR_MS, SPAWN_START_MS * Math.exp(-SPAWN_DECAY * t));
     }
     function growthSpeedPxPerSec(t){
       // 20 + 100 * t/60000 cap 50
