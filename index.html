@@ -75,6 +75,8 @@
     }
     #game{
       width:100%; height:100%; display:block;
+      /* Prevent browser gestures from interfering with taps */
+      touch-action: none;
     }
 
     /* Overlays */
@@ -224,6 +226,17 @@
     const restartBtn = document.getElementById('restartBtn');
     const muteIcon = document.getElementById('muteIcon');
 
+    // ----- Safe Storage helpers (handles Safari Private Mode / quota issues)
+    const safeLS = {
+      get(key, def = null) {
+        try { const v = localStorage.getItem(key); return v === null ? def : v; }
+        catch { return def; }
+      },
+      set(key, value) {
+        try { localStorage.setItem(key, value); } catch {}
+      }
+    };
+
     // ----- Game constants (design-driven)
     const START_SCORE = 1000;
     const SURVIVAL_LOSS_PER_SEC = 100;
@@ -287,10 +300,10 @@
     // ----- Storage
     const LS_HIGH = 'circleTapper.high.v1';
     const LS_MUTED = 'circleTapper.muted.v1';
-    function loadHigh(){ return parseInt(localStorage.getItem(LS_HIGH) || '0', 10); }
-    function saveHigh(v){ localStorage.setItem(LS_HIGH, String(v)); }
-    function loadMuted(){ return localStorage.getItem(LS_MUTED) === '1'; }
-    function saveMuted(v){ localStorage.setItem(LS_MUTED, v ? '1' : '0'); }
+    function loadHigh(){ return parseInt(safeLS.get(LS_HIGH, '0') || '0', 10); }
+    function saveHigh(v){ safeLS.set(LS_HIGH, String(v)); }
+    function loadMuted(){ return safeLS.get(LS_MUTED, '0') === '1'; }
+    function saveMuted(v){ safeLS.set(LS_MUTED, v ? '1' : '0'); }
 
     // ----- Canvas sizing (retina)
     let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -298,7 +311,7 @@
       const rect = document.getElementById('game-container').getBoundingClientRect();
       viewW = Math.max(1, Math.floor(rect.width));
       viewH = Math.max(1, Math.floor(rect.height));
-      dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      dpr = Math.max(1, (window.devicePixelRatio || 1)); // no floor to avoid blur
       canvas.width = Math.floor(viewW * dpr);
       canvas.height = Math.floor(viewH * dpr);
       canvas.style.width = viewW + 'px';
@@ -341,6 +354,7 @@
         if (this.r >= this.maxR){
           // auto penalty and remove
           applyScore(-this.baseReward, this.x, this.y, true);
+          addFloater('Late!', this.x, this.y - 20, 'rgba(255,77,79,0.95)');
           return true; // remove
         }
         return false;
@@ -382,7 +396,7 @@
     }
     function drawRipples(dt){
       for (let i=ripples.length-1;i>=0;i--){
-        const rp = riples = ripples[i];
+        const rp = ripples[i];
         rp.life += dt;
         rp.r += 180 * dt;
         const alpha = Math.max(0, 0.4 - rp.life * 0.6);
@@ -518,6 +532,11 @@
       handleTap((e.clientX - rect.left), (e.clientY - rect.top));
     }, {passive:true});
 
+    // Pause when tab/app loses visibility
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && state === STATE.PLAYING) pauseGame();
+    });
+
     // ----- State transitions
     function startGame(){
       initAudio(); // unlock on user gesture
@@ -598,6 +617,13 @@
         // spawn logic
         const maxC = maxCirclesAllowed(elapsedMs);
         let nextInterval = spawnIntervalMs(elapsedMs);
+
+        // If we're already at capacity, don't let the accumulator
+        // grow unbounded to avoid burst spawns later.
+        if (circles.length >= maxC) {
+          timeSinceSpawnMs = Math.min(timeSinceSpawnMs, nextInterval);
+        }
+
         // spawn as needed if interval passed
         while (timeSinceSpawnMs >= nextInterval && circles.length < maxC){
           spawnCircle();
@@ -638,6 +664,7 @@
     // ----- Init
     function boot(){
       isMuted = loadMuted();
+      high = loadHigh();
       updateHud();
       resizeCanvas();
       state = STATE.START;
